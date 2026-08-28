@@ -1,23 +1,9 @@
 export default async function handler(req, res) {
 const allowedOrigin = "https://gsubigya.github.io";
 
-// CORS headers
+// CORS
 res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
-res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 res.setHeader("Vary", "Origin");
-
-// Handle browser CORS preflight
-if (req.method === "OPTIONS") {
-if (req.headers.origin !== allowedOrigin) {
-return res.status(403).end();
-}
-
-```
-return res.status(204).end();
-```
-
-}
 
 // Only accept POST requests
 if (req.method !== "POST") {
@@ -27,27 +13,38 @@ error: "Method not allowed"
 });
 }
 
-// Check origin
-const origin = req.headers.origin;
-
-if (origin !== allowedOrigin) {
+// Verify request origin
+if (req.headers.origin !== allowedOrigin) {
 return res.status(403).json({
 success: false,
 error: "Forbidden"
 });
 }
 
-// Only accept JSON
-if (!req.headers["content-type"]?.includes("application/json")) {
-return res.status(415).json({
+let data;
+
+try {
+// The frontend sends JSON as text/plain
+if (typeof req.body === "string") {
+data = JSON.parse(req.body);
+} else {
+data = req.body;
+}
+} catch (error) {
+return res.status(400).json({
 success: false,
-error: "Unsupported content type"
+error: "Invalid JSON"
 });
 }
 
-const { name, age, gender, explanation } = req.body || {};
+const {
+name,
+age,
+gender,
+explanation
+} = data || {};
 
-// Validate required fields
+// Check data types
 if (
 typeof name !== "string" ||
 typeof gender !== "string" ||
@@ -59,7 +56,15 @@ error: "Invalid data"
 });
 }
 
-// Validate age
+// Name validation
+if (name.length < 2 || name.length > 80) {
+return res.status(400).json({
+success: false,
+error: "Invalid name"
+});
+}
+
+// Age validation
 const numericAge = Number(age);
 
 if (
@@ -73,15 +78,7 @@ error: "Invalid age"
 });
 }
 
-// Validate name
-if (name.length < 2 || name.length > 80) {
-return res.status(400).json({
-success: false,
-error: "Invalid name"
-});
-}
-
-// Validate gender
+// Gender validation
 const allowedGenders = [
 "Male",
 "Female",
@@ -96,7 +93,7 @@ error: "Invalid gender"
 });
 }
 
-// Validate explanation
+// Explanation validation
 if (
 explanation.length < 1 ||
 explanation.length > 1000
@@ -107,7 +104,7 @@ error: "Invalid explanation"
 });
 }
 
-// Telegram secrets are ONLY stored on Vercel
+// Read secrets from Vercel environment variables
 const botToken = process.env.BOT_TOKEN;
 const chatId = process.env.CHAT_ID;
 
@@ -152,7 +149,7 @@ text: message
 const telegramData = await telegramResponse.json();
 
 if (!telegramResponse.ok || !telegramData.ok) {
-  console.error("Telegram request failed");
+  console.error("Telegram API request failed");
 
   return res.status(502).json({
     success: false,
