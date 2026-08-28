@@ -3,9 +3,16 @@ const allowedOrigin = "https://gsubigya.github.io";
 
 // CORS
 res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 res.setHeader("Vary", "Origin");
 
-// Only accept POST requests
+// CORS preflight
+if (req.method === "OPTIONS") {
+return res.status(204).end();
+}
+
+// POST only
 if (req.method !== "POST") {
 return res.status(405).json({
 success: false,
@@ -13,7 +20,7 @@ error: "Method not allowed"
 });
 }
 
-// Verify request origin
+// Origin validation
 if (req.headers.origin !== allowedOrigin) {
 return res.status(403).json({
 success: false,
@@ -21,40 +28,47 @@ error: "Forbidden"
 });
 }
 
+// Parse request body
 let data;
 
 try {
-// The frontend sends JSON as text/plain
 if (typeof req.body === "string") {
 data = JSON.parse(req.body);
 } else {
 data = req.body;
 }
-} catch (error) {
+} catch {
 return res.status(400).json({
 success: false,
-error: "Invalid JSON"
+error: "Invalid request"
 });
 }
 
-const {
-name,
-age,
-gender,
-explanation
-} = data || {};
+const name =
+typeof data?.name === "string"
+? data.name.trim()
+: "";
 
-// Check data types
-if (
-typeof name !== "string" ||
-typeof gender !== "string" ||
-typeof explanation !== "string"
-) {
-return res.status(400).json({
-success: false,
-error: "Invalid data"
-});
-}
+const age = Number(data?.age);
+
+const gender =
+typeof data?.gender === "string"
+? data.gender
+: "";
+
+const explanation =
+typeof data?.explanation === "string"
+? data.explanation.trim()
+: "";
+
+/*
+
+* IMPORTANT:
+* No password or credential field is accepted.
+*
+* This endpoint intentionally cannot receive or forward
+* passwords from the phishing-awareness demonstration.
+  */
 
 // Name validation
 if (name.length < 2 || name.length > 80) {
@@ -65,12 +79,10 @@ error: "Invalid name"
 }
 
 // Age validation
-const numericAge = Number(age);
-
 if (
-!Number.isInteger(numericAge) ||
-numericAge < 1 ||
-numericAge > 120
+!Number.isInteger(age) ||
+age < 1 ||
+age > 120
 ) {
 return res.status(400).json({
 success: false,
@@ -104,12 +116,12 @@ error: "Invalid explanation"
 });
 }
 
-// Read secrets from Vercel environment variables
+// Environment secrets
 const botToken = process.env.BOT_TOKEN;
 const chatId = process.env.CHAT_ID;
 
 if (!botToken || !chatId) {
-console.error("Telegram environment variables are missing");
+console.error("Missing Telegram configuration");
 
 ```
 return res.status(500).json({
@@ -121,14 +133,19 @@ return res.status(500).json({
 }
 
 const message =
-`📋 New Survey Response
+`🛡️ Security Testing — Phishing Demo
+
+📋 Survey Response
 
 👤 Name: ${name}
-🎂 Age: ${numericAge}
-⚧ Gender: ${gender}
+🎂 Age: ${age}
+⚧️ Gender: ${gender}
 
 📝 Explanation:
-${explanation}`;
+${explanation}
+
+🔐 Credential Handling:
+No password or real authentication credential was collected or transmitted.`;
 
 try {
 const telegramResponse = await fetch(
@@ -149,7 +166,7 @@ text: message
 const telegramData = await telegramResponse.json();
 
 if (!telegramResponse.ok || !telegramData.ok) {
-  console.error("Telegram API request failed");
+  console.error("Telegram API rejected request");
 
   return res.status(502).json({
     success: false,
@@ -163,7 +180,7 @@ return res.status(200).json({
 ```
 
 } catch (error) {
-console.error("Telegram connection failed");
+console.error("Telegram request failed");
 
 ```
 return res.status(502).json({
