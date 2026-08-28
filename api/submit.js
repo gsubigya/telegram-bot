@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   }
 
   // Check that the request came from your website
-  const allowedOrigin = " https://gsubigya.github.io/telegram-bot";
+  const allowedOrigin = " https://gsubigya.github.io/";
 
   const origin = req.headers.origin;
 
